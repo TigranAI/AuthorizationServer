@@ -1,85 +1,66 @@
 package ru.tigran.authorizationservice.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import ru.tigran.authorizationservice.database.entity.Role;
+import ru.tigran.authorizationservice.controller.dto.LoginDto;
+import ru.tigran.authorizationservice.controller.dto.RefreshTokenDto;
 import ru.tigran.authorizationservice.database.entity.User;
 import ru.tigran.authorizationservice.database.repository.RoleRepository;
 import ru.tigran.authorizationservice.database.repository.UserRepository;
 import ru.tigran.authorizationservice.security.JwtClaims;
-import ru.tigran.authorizationservice.security.JwtUtil;
+import ru.tigran.authorizationservice.security.JwtProperties;
+import ru.tigran.authorizationservice.security.JwtToken;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
+@RequestMapping("/authorize")
 public class MainController {
     @Autowired
     private UserRepository userRepository;
     @Autowired
-    private JwtUtil jwtUtil;
+    private JwtProperties properties;
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
     @Autowired
     private RoleRepository roleRepository;
 
-
-    @RequestMapping("/login")
-    public ResponseEntity<String> login(String username, String password) throws JsonProcessingException {
-        User user = userRepository.findByUsername(username);
-        if (user == null)
-            return new ResponseEntity<>("Username not found!", HttpStatus.FORBIDDEN);
-
-        if (!passwordEncoder.matches(password, user.getPassword()))
-            return new ResponseEntity<>("Incorrect password!", HttpStatus.FORBIDDEN);
-
-        return new ResponseEntity<>(generateJWT(user), HttpStatus.OK);
-    }
-
-    @RequestMapping("/refresh")
-    public ResponseEntity<String> refresh(String jrt) throws JsonProcessingException {
-        User user = userRepository.findByRefreshToken(jrt);
-        if (user == null)
-            return new ResponseEntity<>("Refresh token not found!", HttpStatus.FORBIDDEN);
-
-        return new ResponseEntity<>(generateJWT(user), HttpStatus.OK);
-    }
-
-    @RequestMapping("/validate")
-    public ResponseEntity<String> validate(String username, String jwt) throws JsonProcessingException {
-        User user = userRepository.findByUsername(username);
-        if (user == null)
-            return new ResponseEntity<>("User not found!", HttpStatus.FORBIDDEN);
-
-        try{
-            jwtUtil.TryGetClaims(jwt, user.getSecret());
-            return new ResponseEntity<>("True", HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-
     @RequestMapping("/register")
-    public ResponseEntity<String> register(String username, String password) throws JsonProcessingException {
-        if (userRepository.existsByUsername(username))
-            return new ResponseEntity<>("Username is already exists!", HttpStatus.CONFLICT);
+    public ResponseEntity<String> register(@RequestBody LoginDto form) {
+        if (userRepository.existsByUsername(form.username()))
+            return new ResponseEntity<>("Пользователь с таким именем уже существует", HttpStatus.BAD_REQUEST);
 
-        Role role = roleRepository.findById(1).get();
-        User user = User.of(username, passwordEncoder.encode(password), new HashSet<>(Collections.singleton(role)));
+        User user = User.of(form.username(), passwordEncoder.encode(form.password()), roleRepository.findByName("USER"));
         userRepository.save(user);
 
         return new ResponseEntity<>(generateJWT(user), HttpStatus.OK);
     }
 
-    private String generateJWT(User user) throws JsonProcessingException {
+    @RequestMapping("/login")
+    public ResponseEntity<String> login(@RequestBody LoginDto form) {
+        User user = userRepository.findByUsername(form.username());
+        if (user == null)
+            return new ResponseEntity<>("Пользователь с таким именем не найден", HttpStatus.BAD_REQUEST);
+        if (!passwordEncoder.matches(form.password(), user.getPassword()))
+            return new ResponseEntity<>("Неправильная пара логин пароль", HttpStatus.BAD_REQUEST);
+
+        return new ResponseEntity<>(generateJWT(user), HttpStatus.OK);
+    }
+
+    @RequestMapping("/refresh")
+    public ResponseEntity<String> refresh(@RequestBody RefreshTokenDto token) {
+        User user = userRepository.findByRefreshToken(token.jrt());
+        if (user == null)
+            return new ResponseEntity<>("Refresh token not found!", HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(generateJWT(user), HttpStatus.OK);
+    }
+
+    private String generateJWT(User user) {
         user.setRefreshToken(UUID.randomUUID().toString().replace("-", ""));
         userRepository.save(user);
 
@@ -88,11 +69,6 @@ public class MainController {
                 .setRefreshToken(user.getRefreshToken())
                 .setAuthorities(user.getAuthorities());
 
-        Map<String, Object> values = Map.of(
-                "token", jwtUtil.randomJWT(user, claims),
-                "claims", claims);
-
-        ObjectMapper mapper = new ObjectMapper();
-        return mapper.writeValueAsString(values);
+        return String.format("\"%s\"", JwtToken.of(claims, properties).get());
     }
 }

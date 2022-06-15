@@ -7,24 +7,14 @@ import java.util.Set;
 @Table(name = "roles")
 public class Role {
     @Id
-    private Integer id;
     private String name;
-    @ManyToMany(mappedBy = "roles", fetch = FetchType.LAZY)
-    private Set<User> users;
+    @ManyToMany(mappedBy = "roles")
+    private Set<User> users = new java.util.LinkedHashSet<>();
 
-    public static Role of(Integer id, String name){
+    public static Role of(String name){
         Role result = new Role();
-        result.setId(id);
         result.setName(name);
         return result;
-    }
-
-    public Integer getId() {
-        return id;
-    }
-
-    public void setId(Integer id) {
-        this.id = id;
     }
 
     public String getName() {

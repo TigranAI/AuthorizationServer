@@ -1,7 +1,5 @@
 package ru.tigran.authorizationservice.database.entity;
 
-import ru.tigran.authorizationservice.security.JwtUtil;
-
 import javax.persistence.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -13,19 +11,13 @@ public class User {
     private UUID uuid;
     private String username;
     private String password;
-    private String secret;
     private String refreshToken;
     @ManyToMany(fetch = FetchType.EAGER)
     private Set<Role> roles;
-    private Boolean isAccountNonExpired = true;
-    private Boolean isAccountNonLocked = true;
-    private Boolean isCredentialsNonExpired = true;
-    private Boolean isEnabled = true;
 
     public static User of(String username, String encodedPassword){
         User result = new User();
         result.setUuid(UUID.randomUUID());
-        result.setSecret(JwtUtil.randomSecret());
         result.setUsername(username);
         result.setPassword(encodedPassword);
         return result;
@@ -34,6 +26,12 @@ public class User {
     public static User of(String username, String encodedPassword, HashSet<Role> roles){
         User result = of(username, encodedPassword);
         result.setRoles(roles);
+        return result;
+    }
+
+    public static User of(String username, String encodedPassword, Role role){
+        User result = of(username, encodedPassword);
+        result.setRoles(new HashSet<>(List.of(role)));
         return result;
     }
 
@@ -67,46 +65,6 @@ public class User {
 
     public void setRoles(Set<Role> roles) {
         this.roles = roles;
-    }
-
-    public boolean isAccountNonExpired() {
-        return isAccountNonExpired;
-    }
-
-    public void setAccountNonExpired(boolean accountNonExpired) {
-        isAccountNonExpired = accountNonExpired;
-    }
-
-    public boolean isAccountNonLocked() {
-        return isAccountNonLocked;
-    }
-
-    public void setAccountNonLocked(boolean accountNonLocked) {
-        isAccountNonLocked = accountNonLocked;
-    }
-
-    public boolean isCredentialsNonExpired() {
-        return isCredentialsNonExpired;
-    }
-
-    public void setCredentialsNonExpired(boolean credentialsNonExpired) {
-        isCredentialsNonExpired = credentialsNonExpired;
-    }
-
-    public boolean isEnabled() {
-        return isEnabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        isEnabled = enabled;
-    }
-
-    public String getSecret() {
-        return secret;
-    }
-
-    public void setSecret(String tokenSecret) {
-        this.secret = tokenSecret;
     }
 
     public String getRefreshToken() {

@@ -70,7 +70,7 @@
     </dependencyManagement>
 
     <build>
-        <finalName>Authorization Service</finalName>
+        <finalName>AuthorizationService</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
